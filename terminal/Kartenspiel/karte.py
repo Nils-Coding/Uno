@@ -1,6 +1,7 @@
 FARBEN = ("blau", "rot", "grün", "gelb")
 
 
+# Speichert Farbe und Wert einer normalen Karte.
 class Karte:
     def __init__(self, farbe: str, wert: str | None) -> None:
         self.setFarbe(farbe)
@@ -12,6 +13,7 @@ class Karte:
     def getWert(self) -> str | None:
         return self.__wert
 
+    # Erlaubt nur die vier Kartenfarben und Schwarz für Joker.
     def setFarbe(self, farbe: str) -> None:
         if farbe not in (*FARBEN, "schwarz"):
             raise ValueError("Unbekannte Kartenfarbe.")
@@ -20,11 +22,13 @@ class Karte:
     def setWert(self, wert: str | None) -> None:
         self.__wert = wert
 
+    # Prüft, ob die Farbe oder bei gleichem Kartentyp der Wert passt.
     def passt_auf(self, karte, farbe: str) -> bool:
         return self.getFarbe() == farbe or (
             type(self) is type(karte) and self.getWert() == karte.getWert()
         )
 
+    # Erstellt den Kartentext für die Terminal-Ausgabe.
     def toString(self) -> str:
         return f"{self.__farbe} {self.__wert}"
 
@@ -32,6 +36,7 @@ class Karte:
         return self.toString()
 
 
+# Zeigt beim direkten Aufruf zwei Beispielkarten an.
 if __name__ == "__main__":
     print(Karte("blau", "0"))
     print(Karte("rot", "6"))

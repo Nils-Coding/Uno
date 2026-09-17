@@ -2,7 +2,9 @@ from .sonderkarte import Sonderkarte
 from .stapel import MISCHVERFAHREN, Stapel
 
 
+# Steuert die Spielregeln, die Zugreihenfolge und die Platzierungen.
 class Spiel:
+    # Legt den Anfangszustand vor dem Start einer Runde an.
     def __init__(self, zufall=None) -> None:
         self.__zufall = zufall
         self.__stapel = Stapel(zufall)
@@ -13,6 +15,7 @@ class Spiel:
         self.__gezogen = None
         self.__leerzuege = 0
 
+    # Stellt den Spielzustand über lesbare Eigenschaften bereit.
     @property
     def stapel(self):
         return self.__stapel
@@ -38,17 +41,20 @@ class Spiel:
     def wartet_auf_gezogene_karte(self) -> bool:
         return self.__gezogen is not None
 
+    # Erkennt, ob alle verbliebenen Spieler ohne ziehbare Karte gepasst haben.
     @property
     def festgefahren(self) -> bool:
         aktive = len(self.__spieler) - len(self.__platzierungen)
         return aktive > 1 and self.__leerzuege >= aktive
 
+    # Beendet die Runde bei vollständigen Platzierungen oder Stillstand.
     @property
     def beendet(self) -> bool:
         return bool(self.__spieler) and (
             len(self.__platzierungen) == len(self.__spieler) or self.festgefahren
         )
 
+    # Ermittelt erlaubte Karten; +4 ist bei vorhandener aktiver Farbe gesperrt.
     @property
     def legbare_indizes(self) -> tuple[int, ...]:
         hand = self.aktueller_spieler.getKarten()
@@ -64,6 +70,7 @@ class Spiel:
             )
         )
 
+    # Mischt und verteilt die Karten und setzt den Rundenzustand zurück.
     def starten(self, spieleranzahl: int, mischverfahren: str = "zufall") -> None:
         if not 2 <= spieleranzahl <= 10:
             raise ValueError("Es müssen 2 bis 10 Spieler teilnehmen.")
@@ -80,6 +87,7 @@ class Spiel:
         self.__gezogen = None
         self.__leerzuege = 0
 
+    # Prüft den Spielzug und legt die ausgewählte Karte ab.
     def legen(self, index: int, farbe: str | None = None):
         hand = self.aktueller_spieler
         if index not in self.legbare_indizes:
@@ -93,6 +101,7 @@ class Spiel:
         if not hand:
             self.__platzierungen.append(hand.getNummer())
         schritte = 1
+        # Wendet Richtungswechsel, Aussetzen oder Strafkarten auf den Zug an.
         if isinstance(karte, Sonderkarte):
             funktion = karte.get_Funktion()
             if funktion == "Richtungswechsel":
@@ -105,6 +114,7 @@ class Spiel:
                 for _ in range(int(karte.getWert())):
                     nachbar.ziehen(self.__stapel)
                 schritte = 2
+        # Vergibt den letzten Platz oder schaltet zum nächsten Spieler weiter.
         verbleibend = [
             hand for hand in self.__spieler if hand.getNummer() not in self.__platzierungen
         ]
@@ -114,6 +124,7 @@ class Spiel:
             self._weiter(schritte)
         return karte
 
+    # Lässt eine passende gezogene Karte noch spielen, sonst endet der Zug.
     def ziehen(self):
         hand = self.aktueller_spieler
         if self.__gezogen is not None:
@@ -125,29 +136,34 @@ class Spiel:
             self._weiter()
         return karte
 
+    # Beendet den Zug, ohne die gerade gezogene Karte zu spielen.
     def passen(self) -> None:
         self._pruefe_laufend()
         if self.__gezogen is None:
             raise ValueError("Vor dem Passen muss eine Karte gezogen werden.")
         self._weiter()
 
+    # Übergibt Ein- und Ausgabe an die Terminal-Oberfläche.
     def spielen(self) -> None:
         from .terminal import Terminal
 
         Terminal().spielen(self)
 
+    # Verhindert Spielzüge vor dem Start oder nach dem Rundenende.
     def _pruefe_laufend(self) -> None:
         if not self.__spieler:
             raise ValueError("Das Spiel wurde noch nicht gestartet.")
         if self.beendet:
             raise ValueError("Die Runde ist beendet.")
 
+    # Sucht in Spielrichtung den nächsten Spieler ohne Platzierung.
     def _naechster(self, index: int) -> int:
         while True:
             index = (index + self.__richtung) % len(self.__spieler)
             if self.__spieler[index].getNummer() not in self.__platzierungen:
                 return index
 
+    # Schließt den Zug ab und überspringt bei Bedarf einen Spieler.
     def _weiter(self, schritte: int = 1) -> None:
         self.__gezogen = None
         for _ in range(schritte):

@@ -96,6 +96,8 @@ class Ansicht:
         self._kopf(app)
         if app.phase == "start":
             self._start(app)
+        elif app.phase == "mischen":
+            self._mischen(app)
         else:
             self._tisch(app)
             if app.phase in ("uebergabe", "farbe", "ergebnis", "pause", "hilfe"):
@@ -123,9 +125,31 @@ class Ansicht:
             pygame.draw.circle(self.flaeche, farbe, (x + index * 12, 46), 4)
         pygame.draw.line(self.flaeche, RAND, (48, 80), (1392, 80))
         if app.phase != "start":
-            self.text(f"RUNDE {app.runde:02}", (1060, 39), 14, LEISE, True)
-            self.button((1200, 25, 88, 40), "Regeln", "hilfe")
-            self.button((1300, 25, 92, 40), "Pause", "pause")
+            runde = app.runde + 1 if app.phase == "mischen" else app.runde
+            self.text(f"RUNDE {runde:02}", (1060, 39), 14, LEISE, True)
+            if app.phase != "mischen":
+                self.button((1200, 25, 88, 40), "Regeln", "hilfe")
+                self.button((1300, 25, 92, 40), "Pause", "pause")
+
+    def _mischen(self, app):
+        animation = app.mischanimation
+        t = animation.fortschritt(app.zeit)
+        self.text("DIE RUNDE WIRD VORBEREITET", (720, 146), 13, AKZENT, True, True)
+        self.text(f"Wir mischen: {animation.titel}", (720, 200), 43, HELL, True, True)
+        self.text(animation.beschreibung, (720, 248), 19, LEISE, mitte=True)
+        pygame.draw.ellipse(self.flaeche, RAND, (245, 308, 950, 320), 1)
+        for x, y, winkel in animation.karten(app.zeit):
+            self.karte("Deck.png", (round(x), round(y)), 128, round(winkel))
+        self.text(animation.schritt(app.zeit), (720, 666), 21, HELL, True, True)
+        pygame.draw.rect(self.flaeche, RAND, (500, 705, 440, 5), border_radius=2)
+        if t > 0:
+            pygame.draw.rect(self.flaeche, AKZENT, (500, 705, max(1, round(440 * t)), 5), border_radius=2)
+        self.text(
+            f"Anschließend erhält jeder der {animation.spieleranzahl} Spieler 7 Karten.",
+            (720, 744), 16, LEISE, mitte=True,
+        )
+        self.button((595, 797, 250, 49), "Überspringen  →", "mischen_beenden")
+        self.text("Enter oder Leertaste zum Überspringen", (720, 869), 12, LEISE, mitte=True)
 
     def _start(self, app):
         self.text("UNO", (82, 264), 156, HELL, True)

@@ -6,6 +6,7 @@ from ..spiel import Spiel
 from ..stapel import MISCHVERFAHREN
 from .ansicht import GROESSE, Ansicht
 from .assets import dateiname
+from .mischanimation import Mischanimation
 
 
 @dataclass
@@ -41,6 +42,7 @@ class Anwendung:
         self.joker_index: int | None = None
         self.hand_start = 0
         self.animation: Animation | None = None
+        self.mischanimation: Mischanimation | None = None
         self.spieler_vor_zug = 1
         self.meldung = ""
         self.meldung_bis = 0.0
@@ -59,6 +61,8 @@ class Anwendung:
 
     def aktualisieren(self, sekunden: float) -> None:
         self.zeit += sekunden
+        if self.mischanimation is not None and self.mischanimation.fortschritt(self.zeit) >= 1:
+            self.aktion("mischen_beenden")
         if self.animation is not None and self.zeit >= self.animation.beginn + self.animation.dauer:
             self.animation = None
             self._nach_zug()
@@ -134,13 +138,15 @@ class Anwendung:
                 self.aktion("abbrechen")
             elif self.phase == "start":
                 self.laeuft = False
-            elif self.phase != "animation":
+            elif self.phase not in ("animation", "mischen"):
                 self._pause("pause")
         elif taste in (pygame.K_RETURN, pygame.K_SPACE):
             if self.phase == "uebergabe":
                 self.aktion("bereit")
             elif self.phase == "start":
                 self.aktion("starten")
+            elif self.phase == "mischen":
+                self.aktion("mischen_beenden")
         elif self.phase == "spielen":
             if taste == pygame.K_d:
                 self.aktion("ziehen")
@@ -161,7 +167,20 @@ class Anwendung:
         elif aktion == "mischen" and self.phase == "start":
             self.mischindex = wert
         elif aktion == "starten" and self.phase in ("start", "ergebnis"):
-            self.spiel.starten(self.anzahl, MISCHVERFAHREN[self.mischindex])
+            self.mischanimation = Mischanimation(
+                MISCHVERFAHREN[self.mischindex], self.zeit, self.anzahl
+            )
+            self.phase = "mischen"
+            self.animation = None
+            self.meldung = ""
+            self.hover = None
+            self.klick_index = None
+            self.gezogen_index = None
+            self.joker_index = None
+        elif aktion == "mischen_beenden" and self.phase == "mischen":
+            mischen = self.mischanimation
+            self.spiel.starten(mischen.spieleranzahl, mischen.verfahren)
+            self.mischanimation = None
             self.runde += 1
             self.phase = "uebergabe"
             self.meldung = ""
@@ -202,7 +221,7 @@ class Anwendung:
             self._nach_zug()
         elif aktion == "blaettern" and self.phase == "spielen":
             self._blaettern(wert)
-        elif aktion in ("pause", "hilfe") and self.phase not in ("start", "animation"):
+        elif aktion in ("pause", "hilfe") and self.phase not in ("start", "animation", "mischen"):
             self._pause(aktion)
         elif aktion == "fortsetzen" and self.phase in ("pause", "hilfe"):
             self.phase = self.vor_pause
