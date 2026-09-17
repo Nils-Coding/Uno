@@ -1,5 +1,3 @@
-from collections.abc import Callable
-
 from .karte import FARBEN
 from .spiel import Spiel
 from .stapel import MISCHVERFAHREN
@@ -8,13 +6,13 @@ from .stapel import MISCHVERFAHREN
 class Terminal:
     def __init__(
         self,
-        eingabe: Callable[[str], str] = input,
-        ausgabe: Callable[[str], None] = print,
+        eingabe=input,
+        ausgabe=print,
     ) -> None:
         self.eingabe = eingabe
         self.ausgabe = ausgabe
 
-    def spielen(self, spiel: Spiel) -> None:
+    def spielen(self, spiel) -> None:
         self.ausgabe("UNO · 2–10 Spieler · q beendet das Spiel")
         try:
             anzahl = self._zahl("Anzahl der Spieler: ", 2, 10)
@@ -28,7 +26,7 @@ class Terminal:
         except (EOFError, KeyboardInterrupt):
             self.ausgabe("\nSpiel beendet.")
 
-    def _runde(self, spiel: Spiel) -> None:
+    def _runde(self, spiel) -> None:
         while not spiel.beendet:
             hand = spiel.aktueller_spieler
             self._lesen(f"\nSpieler {hand.getNummer()}: Enter, um die Hand anzuzeigen. ")
@@ -64,7 +62,7 @@ class Terminal:
         for platz, nummer in enumerate(spiel.platzierungen, start=1):
             self.ausgabe(f"{platz}. Platz: Spieler {nummer}")
 
-    def _legen(self, spiel: Spiel, index: int | None = None) -> None:
+    def _legen(self, spiel, index: int | None = None) -> None:
         while True:
             auswahl = index
             if auswahl is None:
@@ -81,7 +79,7 @@ class Terminal:
             self.ausgabe(f"Gelegt: {karte}")
             return
 
-    def _ziehen(self, spiel: Spiel) -> None:
+    def _ziehen(self, spiel) -> None:
         karte = spiel.ziehen()
         self.ausgabe(f"Gezogen: {karte}" if karte is not None else "Keine Karte mehr ziehbar.")
         if spiel.wartet_auf_gezogene_karte:

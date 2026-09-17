@@ -1,32 +1,28 @@
-from random import Random
-
-from .hand import Hand
-from .karte import Karte
 from .sonderkarte import Sonderkarte
 from .stapel import MISCHVERFAHREN, Stapel
 
 
 class Spiel:
-    def __init__(self, zufall: Random | None = None) -> None:
+    def __init__(self, zufall=None) -> None:
         self.__zufall = zufall
         self.__stapel = Stapel(zufall)
-        self.__spieler: list[Hand] = []
+        self.__spieler: list = []
         self.__am_zug = 0
         self.__richtung = 1
         self.__platzierungen: list[int] = []
-        self.__gezogen: Karte | None = None
+        self.__gezogen = None
         self.__leerzuege = 0
 
     @property
-    def stapel(self) -> Stapel:
+    def stapel(self):
         return self.__stapel
 
     @property
-    def spieler(self) -> tuple[Hand, ...]:
+    def spieler(self) -> tuple:
         return tuple(self.__spieler)
 
     @property
-    def aktueller_spieler(self) -> Hand:
+    def aktueller_spieler(self):
         self._pruefe_laufend()
         return self.__spieler[self.__am_zug]
 
@@ -84,7 +80,7 @@ class Spiel:
         self.__gezogen = None
         self.__leerzuege = 0
 
-    def legen(self, index: int, farbe: str | None = None) -> Karte:
+    def legen(self, index: int, farbe: str | None = None):
         hand = self.aktueller_spieler
         if index not in self.legbare_indizes:
             raise ValueError("Diese Karte darf nicht gelegt werden.")
@@ -118,7 +114,7 @@ class Spiel:
             self._weiter(schritte)
         return karte
 
-    def ziehen(self) -> Karte | None:
+    def ziehen(self):
         hand = self.aktueller_spieler
         if self.__gezogen is not None:
             raise ValueError("Die gezogene Karte legen oder passen.")

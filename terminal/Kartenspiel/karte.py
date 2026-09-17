@@ -20,7 +20,7 @@ class Karte:
     def setWert(self, wert: str | None) -> None:
         self.__wert = wert
 
-    def passt_auf(self, karte: "Karte", farbe: str) -> bool:
+    def passt_auf(self, karte, farbe: str) -> bool:
         return self.getFarbe() == farbe or (
             type(self) is type(karte) and self.getWert() == karte.getWert()
         )

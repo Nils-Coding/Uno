@@ -1,22 +1,12 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
-from .karte import Karte
-
-if TYPE_CHECKING:
-    from .stapel import Stapel
-
-
 class Hand:
-    def __init__(self, karten: list[Karte], nummer: int) -> None:
+    def __init__(self, karten: list, nummer: int) -> None:
         self.setKarten(karten)
         self.setNummer(nummer)
 
-    def getKarten(self) -> list[Karte]:
+    def getKarten(self) -> list:
         return self.__karten.copy()
 
-    def setKarten(self, karten: list[Karte]) -> None:
+    def setKarten(self, karten: list) -> None:
         self.__karten = list(karten)
 
     def getNummer(self) -> int:
@@ -27,13 +17,13 @@ class Hand:
             raise ValueError("Spielernummern beginnen bei 1.")
         self.__nummer = nummer
 
-    def ziehen(self, stapel: Stapel) -> Karte | None:
+    def ziehen(self, stapel):
         karte = stapel.ziehen()
         if karte is not None:
             self.__karten.append(karte)
         return karte
 
-    def ablegen(self, stapel: Stapel, index: int, farbe: str | None = None) -> bool:
+    def ablegen(self, stapel, index: int, farbe: str | None = None) -> bool:
         if not 0 <= index < len(self.__karten):
             return False
         if not stapel.ablegen(self.__karten[index], farbe):

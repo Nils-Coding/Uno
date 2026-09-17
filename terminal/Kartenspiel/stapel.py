@@ -8,10 +8,10 @@ MISCHVERFAHREN = ("zufall", "overhand", "riffle", "häufchen")
 
 
 class Stapel:
-    def __init__(self, zufall: Random | None = None) -> None:
+    def __init__(self, zufall=None) -> None:
         self.__zufall = zufall if zufall is not None else Random()
-        self.__verdeckt: list[Karte] = []
-        self.__abgelegt: list[Karte] = []
+        self.__verdeckt: list = []
+        self.__abgelegt: list = []
         self.__farbe: str | None = None
         for farbe in FARBEN:
             self.__verdeckt.append(Karte(farbe, "0"))
@@ -36,16 +36,16 @@ class Stapel:
     def aktive_farbe(self) -> str | None:
         return self.__farbe
 
-    def getVerdeckt(self) -> list[Karte]:
+    def getVerdeckt(self) -> list:
         return self.__verdeckt.copy()
 
-    def getAbgelegt(self) -> list[Karte]:
+    def getAbgelegt(self) -> list:
         return self.__abgelegt.copy()
 
-    def setVerdeckt(self, karten: list[Karte]) -> None:
+    def setVerdeckt(self, karten: list) -> None:
         self.__verdeckt = list(karten)
 
-    def setAbgelegt(self, karten: list[Karte] | None = None) -> list[Karte]:
+    def setAbgelegt(self, karten: list | None = None) -> list:
         if karten is None:
             karte = self.ziehen()
             if karte is None:
@@ -89,7 +89,7 @@ class Stapel:
                     )
                     karten.append(stapel.pop())
         else:
-            haeufchen: list[list[Karte]] = [[] for _ in range(7)]
+            haeufchen: list[list] = [[] for _ in range(7)]
             for karte in karten:
                 self.__zufall.choice(haeufchen).append(karte)
             self.__zufall.shuffle(haeufchen)
@@ -97,7 +97,7 @@ class Stapel:
         if stapelnummer != 0 and karten:
             self.__farbe = karten[-1].getFarbe()
 
-    def aufgedeckt(self) -> Karte:
+    def aufgedeckt(self):
         if not self.__abgelegt:
             raise ValueError("Der Ablagestapel ist leer.")
         return self.__abgelegt[-1]
@@ -105,7 +105,7 @@ class Stapel:
     def getAnzahl(self) -> int:
         return len(self.__verdeckt)
 
-    def ausgeben(self, spieleranzahl: int) -> list[Hand]:
+    def ausgeben(self, spieleranzahl: int) -> list:
         if not 2 <= spieleranzahl <= 10:
             raise ValueError("Es müssen 2 bis 10 Spieler teilnehmen.")
         if len(self.__verdeckt) < spieleranzahl * 7 + 1:
@@ -121,14 +121,14 @@ class Stapel:
             pass
         return spieler
 
-    def ziehen(self) -> Karte | None:
+    def ziehen(self):
         if not self.__verdeckt and len(self.__abgelegt) > 1:
             self.__verdeckt = self.__abgelegt[:-1]
             self.__abgelegt = self.__abgelegt[-1:]
             self.mischen(0)
         return self.__verdeckt.pop() if self.__verdeckt else None
 
-    def ablegen(self, karte: Karte, farbe: str | None = None) -> bool:
+    def ablegen(self, karte, farbe: str | None = None) -> bool:
         if not self.__abgelegt or not karte.passt_auf(self.aufgedeckt(), self.__farbe):
             return False
         if karte.getFarbe() == "schwarz":

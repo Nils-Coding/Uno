@@ -1,6 +1,5 @@
 from .karte import Karte
 
-
 class Sonderkarte(Karte):
     def __init__(self, farbe: str, wert: str | None, funktion: str) -> None:
         super().__init__(farbe, wert)
@@ -9,7 +8,7 @@ class Sonderkarte(Karte):
     def get_Funktion(self) -> str:
         return self.__funktion
 
-    def passt_auf(self, karte: Karte, farbe: str) -> bool:
+    def passt_auf(self, karte, farbe: str) -> bool:
         return (
             self.getFarbe() == "schwarz"
             or self.getFarbe() == farbe
