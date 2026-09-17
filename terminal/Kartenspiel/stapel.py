@@ -77,7 +77,7 @@ class Stapel:
         if verfahren == "zufall":
             self.__zufall.shuffle(karten)
         elif verfahren == "overhand":
-            # Overhand: Verschiebt mehrfach kleine Kartenpakete.
+            # Overhand.
             for _ in range(12):
                 rest = karten.copy()
                 karten.clear()
@@ -86,7 +86,7 @@ class Stapel:
                     karten.extend(rest[-anzahl:])
                     del rest[-anzahl:]
         elif verfahren == "riffle":
-            # Riffle: Teilt den Stapel und verzahnt die beiden Hälften.
+            # Riffle.
             for _ in range(7):
                 mitte = sum(self.__zufall.randrange(2) for _ in karten)
                 links, rechts = karten[:mitte][::-1], karten[mitte:][::-1]
