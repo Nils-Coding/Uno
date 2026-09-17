@@ -16,4 +16,4 @@ uno-ui = "Kartenspiel.ui:main"
 include = ["Kartenspiel*"]
 
 [tool.setuptools.package-data]
-"Kartenspiel.ui" = ["assets/*.png"]
+"Kartenspiel.ui" = ["assets/*.png", "assets/audio/*.ogg", "assets/audio/*.wav", "assets/audio/*.txt"]

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import pygame
 
 from .assets import Assets, dateiname
+from .effekte import impuls, konfetti, pokal, tischlicht
 
 if TYPE_CHECKING:
     from .anwendung import Anwendung
@@ -53,6 +54,7 @@ class Ansicht:
         self.buttons: list[Schaltflaeche] = []
         self.karten: list[Kartenflaeche] = []
         self.maus = (-1, -1)
+        self._kartenhub = {}
         self.hintergrund = self.assets.bild("Table_3.png", *GROESSE).copy()
         self.hintergrund.fill((95, 135, 109), special_flags=pygame.BLEND_RGB_MULT)
         self.schrift = pygame.font.match_font("Arial,DejaVu Sans")
@@ -100,21 +102,30 @@ class Ansicht:
             self._mischen(app)
         else:
             self._tisch(app)
+            if app.phase == "animation":
+                self._spieleffekt(app)
             if app.phase in ("uebergabe", "farbe", "ergebnis", "pause", "hilfe"):
                 self._dialog(app)
-        if app.animation is not None:
+        if app.animation is not None and app.zeit < app.animation.beginn + app.animation.dauer:
             animation = app.animation
             t = min(1, (app.zeit - animation.beginn) / animation.dauer)
             weich = 1 - (1 - t) ** 3
             position = animation.von.lerp(animation.nach, weich)
-            self.karte(animation.name, position, 190, (1 - weich) * -12)
+            position.y -= math.sin(t * math.pi) * 38
+            self.karte(animation.name, position, round(190 + math.sin(t * math.pi) * 18), (1 - weich) * -12)
+        if app.phase not in ("start", "mischen", "pause", "hilfe", "ergebnis", "uebergabe"):
+            impuls(self.flaeche, app.zeit - app.impuls_seit, FARBEN.get(app.impuls_farbe, AKZENT))
         if app.gezogen_index is not None and app.phase == "spielen":
             karte = app.spiel.aktueller_spieler.getKarten()[app.gezogen_index]
             self.karte(dateiname(karte), app.maus, 208, -4, True)
-        if app.meldung and app.zeit < app.meldung_bis:
+        effekt_sichtbar = (app.effekt and app.phase == "animation"
+                          and 0 <= app.zeit - app.effekt.beginn < app.effekt.dauer)
+        if app.meldung and app.zeit < app.meldung_bis and app.phase != "ergebnis" and not effekt_sichtbar:
             breite = min(1220, self.font(18).size(app.meldung)[0] + 56)
             self.panel((720 - breite // 2, 92, breite, 48), (36, 57, 42), 24)
             self.text(app.meldung, (720, 116), 18, AKZENT, mitte=True)
+        if app.ton.stumm:
+            self.text("TON AUS · M", (875, 39), 13, LEISE, True)
         return self.flaeche
 
     def _kopf(self, app):
@@ -152,7 +163,10 @@ class Ansicht:
         self.text("Enter oder Leertaste zum Überspringen", (720, 869), 12, LEISE, mitte=True)
 
     def _start(self, app):
+        self.text("DER SPIELEABEND BEGINNT HIER", (88, 245), 13, AKZENT, True)
         self.text("UNO", (82, 264), 156, HELL, True)
+        self.text("Ein Tisch. Alle gegen alle.", (88, 453), 26, HELL)
+        self.text("2–10 Spieler · Gemeinsam an einem Bildschirm", (88, 496), 17, LEISE)
         for name, x, y, winkel in (
             ("Blue_2.png", 907, 357, 23),
             ("Green_Reverse.png", 1040, 325, 6),
@@ -179,13 +193,39 @@ class Ansicht:
                 app.mischindex == index,
             )
         self.button((1112, 674, 230, 65), "Spiel starten", "starten", aktiv=True)
+        self.panel((64, 800, 1312, 76), (15, 34, 29), 20)
+        self.text("KLANG", (88, 829), 13, AKZENT, True)
+        self._tonschalter(app, 164, 817)
+        self._lautstaerke(app, "Effekte", "effektpegel", app.ton.effekte, 410, 817)
+        self.button((757, 817, 160, 42), "Musik an" if app.ton.musik_an else "Musik aus",
+                    "musik", aktiv=app.ton.musik_an, an=app.ton.verfuegbar)
+        self._lautstaerke(app, "Musik", "musikpegel", app.ton.musik, 965, 817)
+
+    def _tonschalter(self, app, x, y):
+        label = "Ton aus · M" if app.ton.stumm else "Ton an · M"
+        if not app.ton.verfuegbar:
+            label = "Kein Audiogerät"
+        self.button((x, y, 188, 42), label, "stumm",
+                    aktiv=not app.ton.stumm and app.ton.verfuegbar, an=app.ton.verfuegbar)
+
+    def _lautstaerke(self, app, label, aktion, wert, x, y):
+        self.text(label, (x, y + 11), 16, LEISE)
+        self.button((x + 76, y, 40, 42), "−", aktion, -10,
+                    an=app.ton.verfuegbar and wert > 0)
+        self.text(f"{round(wert * 100)} %", (x + 157, y + 21), 17, HELL, True, True)
+        self.button((x + 198, y, 40, 42), "+", aktion, 10,
+                    an=app.ton.verfuegbar and wert < 1)
 
     def _tisch(self, app):
         spiel = app.spiel
+        aktive_farbe = FARBEN.get(spiel.stapel.aktive_farbe, AKZENT)
+        self.flaeche.blit(tischlicht(aktive_farbe), (559, 219))
         pygame.draw.ellipse(self.flaeche, (59, 88, 68), (220, 215, 1000, 338), 1)
         pygame.draw.ellipse(self.flaeche, (37, 66, 51), (230, 225, 980, 318), 1)
         self._mitspieler(app)
         self.text("DER TISCH", (720, 255), 12, LEISE, True, True)
+        if app.phase in ("spielen", "animation"):
+            self._verlauf(app)
         startwinkel = math.pi / 5 if spiel.richtung == 1 else math.pi * 4 / 5
         pygame.draw.arc(self.flaeche, LEISE, (706, 288, 28, 28), startwinkel, startwinkel + 5, 2)
         pfeil = [(732, 288), (735, 298), (724, 295)]
@@ -200,6 +240,13 @@ class Ansicht:
         if app.phase == "spielen" and not spiel.wartet_auf_gezogene_karte:
             self.buttons.append(Schaltflaeche(pygame.Rect(519, 311, 160, 202), "ziehen"))
         abgelegt = spiel.stapel.getAbgelegt()
+        if app.animation and app.animation.name != "Deck.png" and app.zeit < app.animation.beginn + app.animation.dauer:
+            abgelegt = abgelegt[:-1]
+        if app.gezogen_index is not None:
+            erlaubt = app.gezogen_index in spiel.legbare_indizes
+            ziel_farbe = AKZENT if erlaubt else FARBEN["rot"]
+            pygame.draw.rect(self.flaeche, ziel_farbe, (738, 290, 162, 230), 2, border_radius=20)
+            self.text("Hier ablegen" if erlaubt else "Passt nicht", (819, 278), 15, ziel_farbe, True, True)
         for index, karte in enumerate(abgelegt[-3:]):
             self.karte(dateiname(karte), (819, 404), 185, (len(abgelegt[-3:]) - 1 - index) * 7 - 5)
         self.text("NACHZIEHEN", (599, 526), 12, LEISE, True, True)
@@ -209,8 +256,13 @@ class Ansicht:
         pygame.draw.circle(self.flaeche, FARBEN.get(farbe, HELL), (783, 552), 5)
         self.text(farbe.capitalize(), (801, 540), 16)
         if not spiel.beendet:
-            self.text("DU BIST DRAN", (1102, 331), 12, AKZENT, True)
+            self.text("GLEICH AM ZUG" if app.phase == "animation" else "DU BIST DRAN",
+                      (1102, 331), 12, AKZENT, True)
             self.text(f"Spieler {spiel.aktueller_spieler.getNummer()}", (1098, 354), 30, HELL, True)
+            if app.phase == "spielen":
+                erlaubt = len(spiel.legbare_indizes)
+                hinweis = f"{erlaubt} passende Karte" + ("n" if erlaubt != 1 else "")
+                self.text(hinweis if erlaubt else "Zeit für eine neue Karte.", (1102, 399), 16, LEISE)
             warten = spiel.wartet_auf_gezogene_karte
             self.button(
                 (1102, 446, 251, 52),
@@ -227,6 +279,46 @@ class Ansicht:
                 self.karte("Deck.png", (504 + index * 72, 753), 159, 9 - index * 3)
         self.text("Klicken oder auf die Ablage ziehen", (48, 882), 12, LEISE)
         self.text("D  Ziehen   ·   ← →  Hand blättern   ·   Esc  Pause", (1040, 882), 12, LEISE)
+
+    def _verlauf(self, app):
+        effekt = app.effekt
+        if effekt and app.phase == "animation" and 0 <= app.zeit - effekt.beginn < effekt.dauer:
+            return
+        self.text("LETZTE AKTIONEN", (70, 323), 11, LEISE, True)
+        if not app.verlauf:
+            self.text("Der erste Zug gehört dir.", (70, 358), 17, HELL)
+        for i, (spieler, text, farbe) in enumerate(reversed(app.verlauf)):
+            y = 357 + i * 61
+            pygame.draw.circle(self.flaeche, FARBEN.get(farbe, AKZENT), (76, y + 7), 3)
+            self.text(spieler, (91, y - 3), 13, HELL if i == 0 else LEISE, True)
+            while self.font(14).size(text)[0] > 260:
+                text = text[:-2].rstrip("…") + "…"
+            self.text(text, (91, y + 18), 14, LEISE)
+
+    def _spieleffekt(self, app):
+        effekt = app.effekt
+        if not effekt or not 0 <= app.zeit - effekt.beginn < effekt.dauer:
+            return
+        t = app.zeit - effekt.beginn
+        farbe = FARBEN.get(effekt.farbe, AKZENT)
+        y = 345 + round(16 * (1 - min(1, t / 0.18)) ** 3)
+        self.panel((48, y - 31, 355, 177), (19, 43, 35), 22)
+        pygame.draw.rect(self.flaeche, farbe, (70, y - 9, 37, 4), border_radius=2)
+        groesse = 52 if len(effekt.titel) < 7 else 27
+        self.text(effekt.titel, (70, y + 16), groesse, HELL, True)
+        # Lange Hinweise bleiben auch bei zweistelligen Spielernummern im Panel.
+        woerter = effekt.detail.split()
+        zeile, zeilen = "", []
+        for wort in woerter:
+            kandidat = f"{zeile} {wort}".strip()
+            if self.font(15).size(kandidat)[0] > 305:
+                zeilen.append(zeile)
+                zeile = wort
+            else:
+                zeile = kandidat
+        zeilen.append(zeile)
+        for i, zeile in enumerate(zeilen):
+            self.text(zeile, (70, y + 90 + i * 20), 15, LEISE)
 
     def _mitspieler(self, app):
         spiel = app.spiel
@@ -253,6 +345,10 @@ class Ansicht:
         karten = hand.getKarten()
         erlaubt = spiel.legbare_indizes
         self.text(f"Spieler {hand.getNummer()}", (49, 617), 20, HELL, True)
+        self.text(f"{len(karten)} KARTEN", (1270, 623), 12, LEISE, True)
+        if len(karten) == 1:
+            self.panel((225, 611, 77, 32), FARBEN["rot"], 10)
+            self.text("UNO!", (263, 627), 15, HELL, True, True)
         ende = min(len(karten), app.hand_start + 12)
         anzahl = ende - app.hand_start
         schritt = min(96, 1070 / max(1, anzahl - 1))
@@ -260,7 +356,12 @@ class Ansicht:
         for stelle, index in enumerate(range(app.hand_start, ende)):
             t = (stelle - (anzahl - 1) / 2) / max(1, (anzahl - 1) / 2)
             x = 720 + (stelle - (anzahl - 1) / 2) * schritt
-            y = 757 + abs(t) * 15 - (30 if app.hover == index else 0)
+            ziel = 30 if app.hover == index else 0
+            hub = self._kartenhub.get(index, 0)
+            hub += (ziel - hub) * min(1, app.delta * 16)
+            self._kartenhub[index] = hub
+            aufdecken = max(0, min(1, (app.zeit - app.hand_seit - stelle * 0.018) / 0.32))
+            y = 757 + abs(t) * 15 - hub + 30 * (1 - aufdecken) ** 3
             winkel = round(-t * 10, 1)
             bild = self.assets.karte(dateiname(karten[index]), 180, winkel, index in erlaubt)
             if index not in erlaubt:
@@ -290,19 +391,26 @@ class Ansicht:
         if app.phase == "ergebnis":
             self._ergebnis(app)
             return
-        self.panel((395, 219, 650, 460), (19, 41, 33), 28)
+        self.panel((395, 169, 650, 592) if app.phase == "pause" else (395, 219, 650, 460),
+                   (19, 41, 33), 28)
         if app.phase == "uebergabe":
-            self.karte("Deck.png", (720, 300), 87, -9)
-            self.text("SPIELERWECHSEL", (720, 372), 12, AKZENT, True, True)
+            nummer = app.spiel.aktueller_spieler.getNummer()
+            pygame.draw.circle(self.flaeche, RAND, (720, 306), 49)
+            pygame.draw.circle(self.flaeche, AKZENT, (720, 306), 49, 2)
+            self.text(f"{nummer:02}", (720, 306), 34, HELL, True, True)
+            self.text("DEIN ZUG", (720, 385), 12, AKZENT, True, True)
             self.text(
-                f"Spieler {app.spiel.aktueller_spieler.getNummer()}",
+                f"Spieler {nummer}",
                 (720, 427),
                 48,
                 HELL,
                 True,
                 True,
             )
-            self.button((493, 570, 454, 60), "Ich bin bereit  →", "bereit", aktiv=True)
+            self.text("Bildschirm weitergeben. Deine Hand bleibt verdeckt.",
+                      (720, 493), 17, LEISE, mitte=True)
+            self.button((493, 553, 454, 60), "Hand aufdecken  →", "bereit", aktiv=True)
+            self.text("Enter oder Leertaste", (720, 642), 13, LEISE, mitte=True)
         elif app.phase == "farbe":
             self.text("Farbe wählen", (720, 323), 43, HELL, True, True)
             for index, (name, farbe) in enumerate(FARBEN.items()):
@@ -314,11 +422,16 @@ class Ansicht:
                 self.buttons.append(Schaltflaeche(rect, "farbe", name))
             self.button((590, 583, 260, 48), "Zurück zur Hand", "abbrechen")
         elif app.phase == "pause":
-            self.text("Pause", (720, 338), 43, HELL, True, True)
-            self.button((493, 457, 454, 57), "Weiterspielen", "fortsetzen", aktiv=True)
-            self.button((493, 530, 220, 51), "Neue Runde", "neustart")
-            self.button((728, 530, 219, 51), "Beenden", "beenden")
-            self.text("Neue Runde beendet die laufende Runde.", (720, 624), 14, LEISE, mitte=True)
+            self.text("Pause", (720, 244), 43, HELL, True, True)
+            self.button((493, 318, 454, 57), "Weiterspielen", "fortsetzen", aktiv=True)
+            self._tonschalter(app, 493, 409)
+            self.button((759, 409, 188, 42), "Musik an" if app.ton.musik_an else "Musik aus",
+                        "musik", aktiv=app.ton.musik_an, an=app.ton.verfuegbar)
+            self._lautstaerke(app, "Effekte", "effektpegel", app.ton.effekte, 493, 468)
+            self._lautstaerke(app, "Musik", "musikpegel", app.ton.musik, 493, 523)
+            self.button((493, 616, 220, 51), "Neue Runde", "neustart")
+            self.button((728, 616, 219, 51), "Beenden", "beenden")
+            self.text("Neue Runde beendet die laufende Runde.", (720, 704), 14, LEISE, mitte=True)
         else:
             self.text("Spielregeln", (720, 311), 35, HELL, True, True)
             zeilen = (
@@ -336,19 +449,32 @@ class Ansicht:
 
     def _ergebnis(self, app):
         spiel = app.spiel
-        self.panel((400, 117, 640, 701), (19, 41, 33), 28)
-        self.text("ERGEBNIS", (720, 165), 13, AKZENT, True, True)
+        gold = (239, 203, 117)
+        self.panel((400, 105, 640, 735), (19, 41, 33), 28)
+        self.text(f"RUNDE {app.runde:02} · BEENDET", (720, 143), 13, AKZENT, True, True)
+        if not spiel.festgefahren:
+            pokal(self.flaeche, (720, 215), gold)
+        else:
+            self.karte("Deck.png", (720, 219), 92, -8)
         titel = (
             "Runde beendet" if spiel.festgefahren else f"Spieler {spiel.platzierungen[0]} gewinnt!"
         )
-        self.text(titel, (720, 220), 39, HELL, True, True)
-        if spiel.festgefahren:
-            self.text("Keine weiteren Züge möglich.", (720, 271), 18, LEISE, mitte=True)
+        self.text(titel, (720, 304), 36, HELL, True, True)
+        sekunden = int(app.spielzeit)
+        untertitel = ("Keine weiteren Züge möglich." if spiel.festgefahren else
+                      f"{app.aktionen} Aktionen  ·  {sekunden // 60}:{sekunden % 60:02} Minuten am Tisch")
+        self.text(untertitel, (720, 345), 16, LEISE, mitte=True)
+        self.text("PLATZIERUNG", (454, 381), 10, LEISE, True)
+        self.text("SIEGE IN DIESER SERIE", (848, 381), 10, LEISE, True)
         for index, nummer in enumerate(spiel.platzierungen):
-            y = 319 + index * 35
-            self.text(f"{index + 1:02}", (463, y), 19, AKZENT if index == 0 else LEISE, True)
-            self.text(f"Spieler {nummer}", (536, y), 19, HELL, True)
-            if index == 0:
-                self.text("GEWONNEN", (861, y + 4), 12, AKZENT, True)
-        self.button((456, 708, 312, 59), "Noch eine Runde  →", "starten", aktiv=True)
-        self.button((785, 708, 200, 59), "Zum Start", "neustart")
+            y = 407 + index * 28
+            if index == 0 and not spiel.festgefahren:
+                pygame.draw.rect(self.flaeche, (42, 58, 39), (443, y - 4, 554, 27), border_radius=8)
+            self.text(f"{index + 1:02}", (463, y), 16, gold if index == 0 else LEISE, True)
+            self.text(f"Spieler {nummer}", (518, y), 16, HELL, True)
+            self.text(str(app.siege.get(nummer, 0)), (930, y), 16, gold, True)
+        self.button((456, 723, 312, 56), "Revanche  →", "starten", aktiv=True)
+        self.button((785, 723, 200, 56), "Zum Start", "neustart")
+        self.text("Gleiche Spieler, nächste Runde. Die Serie geht weiter.", (720, 808), 13, LEISE, mitte=True)
+        if not spiel.festgefahren:
+            konfetti(self.flaeche, app.zeit - app.ergebnis_seit, tuple(FARBEN.values()) + (gold,))

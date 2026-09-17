@@ -1,0 +1,15 @@
+UNO – Klangquellen
+
+card-*.ogg: Kenney, Casino Audio 1.1
+https://kenney.nl/assets/casino-audio
+Lizenz: CC0, siehe LICENSE-casino.txt.
+
+Übrige OGG-Dateien: Kenney, Interface Sounds 1.0
+https://kenney.nl/assets/interface-sounds
+Lizenz: CC0, siehe LICENSE-interface.txt.
+
+WAV-Dateien: Für dieses Projekt prozedural erzeugte musikalische Motive
+und Hintergrundmusik. Keine Samples oder Melodien aus den Kenney-Jingles.
+Reproduzierbare Quelle: tools/klangwelt_erzeugen.py (Python-Standardbibliothek).
+
+Die historische Vorauswahl unter soundauswahl/ wird nicht mitinstalliert.
